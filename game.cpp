@@ -58,14 +58,14 @@ void Game::startTerminalLoop()
 		Position start, end;
 		cin >> start.x >> start.y >> end.x >> end.y;
 
-		// 2. 基本的安全拦截：选中的是不是空位？选中的是不是自己的棋子？
+		// 2. 安全拦截
 		Piece* selectedPiece = board[start.x][start.y];
 		if (selectedPiece == nullptr || selectedPiece->getColor() != currentTurn) {
 			cout << "Invalid selection! You must select your own piece." << endl;
 			continue; // 选错了，直接跳过本次循环，重新输入
 		}
 
-		// 3. 尝试移动！(调用你千锤百炼的 Move 函数)
+		// 3. 尝试移动
 		bool success = selectedPiece->Move(start, end, board);
 
 		if (success) {
@@ -73,12 +73,12 @@ void Game::startTerminalLoop()
 			cout << "sucessful!";
 			currentTurn = (currentTurn == WHITE) ? BLACK : WHITE;
 
-			// TODO: 可以在这里加一个检查，看看对方是不是被将死了 (Checkmate)
+			// 检查，看看对方是不是被将死了
 			if (isCheckMate()||isStaleMate()) {
 				isGameOver = true;
 			}
 		}
-		// 如果移动失败（返回 false），Move 函数自己会打印报错，循环继续，还是当前玩家重走
+		// 如果移动失败,循环继续，还是当前玩家重走
 	}
 }
 
