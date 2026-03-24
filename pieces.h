@@ -2,6 +2,7 @@
 #include<cmath>
 using namespace std;
 enum  PieceType {
+
 	PAWN,
 	ROOK,
 	KNIGHT,
@@ -10,6 +11,7 @@ enum  PieceType {
 	KING
 };
 enum Color {
+	
 	WHITE,
 	BLACK
 };
@@ -32,6 +34,7 @@ public:
 		position = p;
 		hasMoved = false;
 	}
+	
 	virtual ~Piece() {}
 	virtual MoveMent isValidMove(Position start, Position end, Piece* board[8][8]) = 0;
 	bool Move(Position start, Position end, Piece* board[8][8]);

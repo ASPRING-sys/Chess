@@ -5,8 +5,12 @@
 #include"knight.h"
 #include"queen.h"
 #include"rook.h"
-
+#include<vector>
+#include<string>
+using namespace std;
 MoveRecord lastMove;
+
+vector<string>BoardMessage;
 
 Game::Game()
 {
@@ -92,9 +96,41 @@ bool Game::isStaleMate()
 	return isKingSafe(currentTurn,board) && !hasAnyLegalMove(currentTurn, board);
 }
 
-bool Game::isDraw()
+bool Game::isDraw(vector<string>& Situation)
 {
+	//验证三次重复局面
+	// 如果总局面数少于3次，显然不可能发生三次重复
+	if (Situation.size() < 3) {
+		return false;
+	}
 
+	// 获取当前（最新）的局面
+	const string& currentState = Situation.back();
+
+	// 统计当前局面在整个历史中出现的次数
+	int count = std::count(Situation.begin(), Situation.end(), currentState);
+
+	// 如果出现次数达到或超过3次，则判定为平局
+	return count >= 3;
+}
+
+
+
+void Game::Record_Situation(Piece* board[8][8], vector<string>&Situation)
+{
+	string s = "";
+	for (int i = 0; i < 8; i++) {
+		for (int j = 0; j < 8; j++) {
+			if (board[i][j] != nullptr) {
+				s += (to_string(board[i][j]->getColor()) + to_string(board[i][j]->getType()));
+			}
+			else {
+				s += "-";
+			}
+		}
+	}
+	Situation.push_back(s);
+	
 }
 bool Game::hasAnyLegalMove(Color currentTurn, Piece* board[8][8])
 {

@@ -1,6 +1,7 @@
 #include <SFML/Graphics.hpp>
 #include <iostream>
 #include <map>
+#include<string>
 #include <vector>
 #include "game.h" 
 #include "pieces.h"
@@ -113,6 +114,7 @@ int main()
 						bool moveSuccess = draggedPiece->Move(startPos, endPos, chessgame.getBoard());
 
 						if (moveSuccess) {
+							chessgame.Record_Situation(chessgame.getBoard(), chessgame.getSituation());
 							cout << "Move logic success!" << endl;
 							// 移动成功后，切换回合
 							chessgame.changeTurn(); 
@@ -131,6 +133,11 @@ int main()
 							else if (chessgame.isStaleMate()) {
 								isGameOver = true;
 								gameOverMessage = "Stalemate!\nDraw!";
+								cout << "Game Over: " << gameOverMessage << endl;
+							}
+							else if (chessgame.isDraw(chessgame.getSituation())) {
+								isGameOver = true;
+								gameOverMessage = "Draw!\n";
 								cout << "Game Over: " << gameOverMessage << endl;
 							}
 						}
