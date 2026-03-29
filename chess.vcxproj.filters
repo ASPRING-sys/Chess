@@ -18,39 +18,39 @@
     <ClCompile Include="main.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="king.h">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="knight.h">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="queen.h">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="bishop.h">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="rook.h">
-      <Filter>源文件</Filter>
-    </ClCompile>
     <ClCompile Include="game.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="pieces.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="bishop.h">
+      <Filter>头文件</Filter>
+    </ClCompile>
+    <ClCompile Include="king.h">
+      <Filter>头文件</Filter>
+    </ClCompile>
+    <ClCompile Include="knight.h">
+      <Filter>头文件</Filter>
+    </ClCompile>
+    <ClCompile Include="queen.h">
+      <Filter>头文件</Filter>
+    </ClCompile>
+    <ClCompile Include="rook.h">
+      <Filter>头文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="pieces.h">
-      <Filter>源文件</Filter>
-    </ClInclude>
-    <ClInclude Include="move.h">
-      <Filter>源文件</Filter>
+    <ClInclude Include="pawn.h">
+      <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="game.h">
-      <Filter>源文件</Filter>
+      <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="pawn.h">
+    <ClInclude Include="move.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="pieces.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

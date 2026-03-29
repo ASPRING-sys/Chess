@@ -1,263 +1,288 @@
-#include <SFML/Graphics.hpp>
+
+#include "crow_all.h"
+#include <unordered_set>
+#include <mutex>
 #include <iostream>
-#include <map>
-#include<string>
-#include <vector>
-#include "game.h" 
+#include <string>
+
+#include "game.h"
 #include "pieces.h"
 
 using namespace std;
 
-int main()
-{
-	Game chessgame;
-
-	sf::RenderWindow window(sf::VideoMode(800, 800), "My Chess Engine");
-	float squareSize = 100.f;
-
-	sf::Texture tex_wP, tex_wR, tex_wN, tex_wB, tex_wQ, tex_wK;
-	sf::Texture tex_bP, tex_bR, tex_bN, tex_bB, tex_bQ, tex_bK;
-
-	tex_wP.loadFromFile("images/chess_piece_2_white_pawn.png");
-	tex_wR.loadFromFile("images/chess_piece_2_white_rook.png");
-	tex_wN.loadFromFile("images/chess_piece_2_white_knight.png");
-	tex_wB.loadFromFile("images/chess_piece_2_white_bishop.png");
-	tex_wQ.loadFromFile("images/chess_piece_2_white_queen.png");
-	tex_wK.loadFromFile("images/chess_piece_2_white_king.png");
-
-	tex_bP.loadFromFile("images/bP.png");
-	tex_bR.loadFromFile("images/bR.png");
-	tex_bN.loadFromFile("images/bN.png");
-	tex_bB.loadFromFile("images/bB.png");
-	tex_bQ.loadFromFile("images/bQ.png");
-	tex_bK.loadFromFile("images/bK.png");
-
-	sf::Sprite pieceSprite;
-	pieceSprite.setScale(2, 2);
-
-	sf::RectangleShape square(sf::Vector2f(squareSize, squareSize));
-
-	sf::Color lightColor(240, 217, 181);
-	sf::Color darkColor(181, 136, 99);
-
-	bool isDragging = false;
-	Piece* draggedPiece = nullptr;
-	Position startPos = { -1, -1 };
-	sf::Vector2f offset;
-
-
-	sf::Font font;
-	if (!font.loadFromFile("arial.ttf")) {
-		cout << "Failed to load font!" << endl;
-	}
-
-	sf::Text gameOverText;
-	gameOverText.setFont(font);
-	gameOverText.setCharacterSize(60);
-	gameOverText.setFillColor(sf::Color::Red);
-	gameOverText.setStyle(sf::Text::Bold);
-
-	bool isGameOver = false;
-	string gameOverMessage = "";
-	// ==========================================
-	// 【游戏主循环开始】
-	// ==========================================
-	while (window.isOpen()) {
-		sf::Event event;
-
-		// 1. 处理所有事件
-		while (window.pollEvent(event)) {
-			if (event.type == sf::Event::Closed) {
-				window.close();
-			}
-
-			// 抓起棋子
-			if (event.type == sf::Event::MouseButtonPressed) {
-
-				if (isGameOver)continue;
-
-				if (event.mouseButton.button == sf::Mouse::Left) {
-					sf::Vector2i mousePos = sf::Mouse::getPosition(window);
-
-					int x = mousePos.x / (int)squareSize;
-					int y = mousePos.y / (int)squareSize;
-					y = 7 - y; // 翻转Y轴
-
-					if (x >= 0 && x < 8 && y >= 0 && y < 8) {
-						Piece* p = chessgame.getPiece(x, y);
-						// 确保点中的是当前回合的棋子
-						if (p != nullptr && p->getColor() == chessgame.getcurrentTurn()) {
-							isDragging = true;
-							draggedPiece = p;
-							startPos = { x, y };
-
-							sf::Vector2f piecePixelPos(x * squareSize, (7 - y) * squareSize);
-							offset = sf::Vector2f(mousePos.x, mousePos.y) - piecePixelPos;
-						}
-					}
-				}
-			}
-
-			// 放下棋子
-			if (event.type == sf::Event::MouseButtonReleased) {
-				if (event.mouseButton.button == sf::Mouse::Left) {
-					if (isDragging && draggedPiece != nullptr) {
-						sf::Vector2i mousePos = sf::Mouse::getPosition(window);
-
-						int x = mousePos.x / (int)squareSize;
-						int y = mousePos.y / (int)squareSize;
-						y = 7 - y;
-
-						Position endPos = { x, y };
-
-						// 调用核心引擎
-						bool moveSuccess = draggedPiece->Move(startPos, endPos, chessgame.getBoard());
-
-						if (moveSuccess) {
-							chessgame.Record_Situation(chessgame.getBoard(), chessgame.getSituation());
-							cout << "Move logic success!" << endl;
-							// 移动成功后，切换回合
-							chessgame.changeTurn(); 
-
-							if (chessgame.isCheckMate()) {
-								isGameOver = true;
-
-								if (chessgame.getcurrentTurn() == BLACK) {
-									gameOverMessage = "Checkmate!\nWhite Wins!";
-								}
-								else {
-									gameOverMessage = "Checkmate!\nBlack Wins!";
-								}
-								cout << "Game Over: " << gameOverMessage << endl;
-							}
-							else if (chessgame.isStaleMate()) {
-								isGameOver = true;
-								gameOverMessage = "Stalemate!\nDraw!";
-								cout << "Game Over: " << gameOverMessage << endl;
-							}
-							else if (chessgame.isDraw(chessgame.getSituation())) {
-								isGameOver = true;
-								gameOverMessage = "Draw!\n";
-								cout << "Game Over: " << gameOverMessage << endl;
-							}
-						}
-						else {
-							cout << "Invalid move, snapping back." << endl;
-						}
-
-						// 清理状态
-						isDragging = false;
-						draggedPiece = nullptr;
-						startPos = { -1, -1 };
-					}
-				}
-			}
-		} // 循环结束
-
-		// ==========================================
-		// 2. 画面绘制
-		// ==========================================
-		window.clear();
-
-		// 画棋盘
-		for (int row = 0; row < 8; row++) {
-			for (int col = 0; col < 8; col++) {
-				if ((row + col) % 2 == 0) square.setFillColor(lightColor);
-				else square.setFillColor(darkColor);
-
-				square.setPosition(col * squareSize, row * squareSize);
-				window.draw(square);
-			}
-		}
-
-		// 画棋子
-		for (int x = 0; x < 8; x++) {
-			for (int y = 0; y < 8; y++) {
-				Piece* p = chessgame.getPiece(x, y);
-
-				if (p != nullptr) {
-					// 正在被拖拽的棋子先隐藏，留到最后画
-					if (isDragging && p == draggedPiece) continue;
-
-					// 设置纹理
-					if (p->getColor() == WHITE) {
-						switch (p->getType()) {
-						case PAWN:   pieceSprite.setTexture(tex_wP); break;
-						case ROOK:   pieceSprite.setTexture(tex_wR); break;
-						case KNIGHT: pieceSprite.setTexture(tex_wN); break;
-						case BISHOP: pieceSprite.setTexture(tex_wB); break;
-						case QUEEN:  pieceSprite.setTexture(tex_wQ); break;
-						case KING:   pieceSprite.setTexture(tex_wK); break;
-						}
-					}
-					else {
-						switch (p->getType()) {
-						case PAWN:   pieceSprite.setTexture(tex_bP); break;
-						case ROOK:   pieceSprite.setTexture(tex_bR); break;
-						case KNIGHT: pieceSprite.setTexture(tex_bN); break;
-						case BISHOP: pieceSprite.setTexture(tex_bB); break;
-						case QUEEN:  pieceSprite.setTexture(tex_bQ); break;
-						case KING:   pieceSprite.setTexture(tex_bK); break;
-						}
-					}
-
-					pieceSprite.setPosition(x * squareSize, (7 - y) * squareSize);
-					window.draw(pieceSprite);
-				}
-			}
-		}
-
-		// 单独画出正在拖拽的棋子，确保它在鼠标指针上，并且图层在最上面
-		if (isDragging && draggedPiece != nullptr) {
-
-			// 再次赋予纹理
-			if (draggedPiece->getColor() == WHITE) {
-				switch (draggedPiece->getType()) {
-				case PAWN:   pieceSprite.setTexture(tex_wP); break;
-				case ROOK:   pieceSprite.setTexture(tex_wR); break;
-				case KNIGHT: pieceSprite.setTexture(tex_wN); break;
-				case BISHOP: pieceSprite.setTexture(tex_wB); break;
-				case QUEEN:  pieceSprite.setTexture(tex_wQ); break;
-				case KING:   pieceSprite.setTexture(tex_wK); break;
-				}
-			}
-			else {
-				switch (draggedPiece->getType()) {
-				case PAWN:   pieceSprite.setTexture(tex_bP); break;
-				case ROOK:   pieceSprite.setTexture(tex_bR); break;
-				case KNIGHT: pieceSprite.setTexture(tex_bN); break;
-				case BISHOP: pieceSprite.setTexture(tex_bB); break;
-				case QUEEN:  pieceSprite.setTexture(tex_bQ); break;
-				case KING:   pieceSprite.setTexture(tex_bK); break;
-				}
-			}
-
-			// 获取实时鼠标位置
-			sf::Vector2i currentMousePos = sf::Mouse::getPosition(window);
-			pieceSprite.setPosition(sf::Vector2f(currentMousePos.x, currentMousePos.y) - offset);
-			window.draw(pieceSprite);
-		}
-
-		if (isGameOver) {
-			// 1. 画一个全屏的黑色半透明遮罩，让后面的棋盘变暗
-			sf::RectangleShape overlay(sf::Vector2f(800.f, 800.f));
-			overlay.setFillColor(sf::Color(0, 0, 0, 150)); // 150代表透明度
-			window.draw(overlay);
-
-			// 2. 把文字设置到屏幕正中央
-			gameOverText.setString(gameOverMessage);
-			// 获取文字的实际宽高，用来计算中心点
-			sf::FloatRect textRect = gameOverText.getLocalBounds();
-			gameOverText.setOrigin(textRect.left + textRect.width / 2.0f,
-				textRect.top + textRect.height / 2.0f);
-			gameOverText.setPosition(sf::Vector2f(800.0f / 2.0f, 800.0f / 2.0f));
-
-			// 3. 画出文字
-			window.draw(gameOverText);
-		}
-
-		window.display();
-	} // isOpen 循环结束
-
-	return 0;
+Position stringToPos(const string& str) {
+    Position pos;
+    pos.x = str[0] - 'a';
+    pos.y = str[1] - '1';
+    return pos;
 }
+
+// ==========================================
+// [新增] FEN 生成器：把你的二维数组快照成一行字符串
+// ==========================================
+string generateFEN(Game& game) {
+    string fen = "";
+    // FEN 规则是从第 8 行 (黑方底线 y=7) 开始往下扫，一直扫到第 1 行 (白方底线 y=0)
+    for (int y = 7; y >= 0; y--) {
+        int emptyCount = 0;
+        for (int x = 0; x < 8; x++) {
+            Piece* p = game.getPiece(x, y);
+            if (p == nullptr) {
+                emptyCount++; // 遇到空格子，计数器+1
+            }
+            else {
+                if (emptyCount > 0) {
+                    fen += to_string(emptyCount); // 把累积的空格数写进去
+                    emptyCount = 0;
+                }
+                char c = 'p'; // 默认是兵
+                switch (p->getType()) {
+                case PAWN:   c = 'p'; break;
+                case ROOK:   c = 'r'; break;
+                case KNIGHT: c = 'n'; break;
+                case BISHOP: c = 'b'; break;
+                case QUEEN:  c = 'q'; break;
+                case KING:   c = 'k'; break;
+                }
+                // FEN 规定：大写代表白棋，小写代表黑棋
+                if (p->getColor() == WHITE) {
+                    c = toupper(c);
+                }
+                fen += c;
+            }
+        }
+        if (emptyCount > 0) {
+            fen += to_string(emptyCount); // 补齐行末的空格
+        }
+        if (y > 0) fen += "/"; // 每行之间用斜杠隔开
+    }
+    return fen;
+}
+
+int main() {
+    crow::SimpleApp app;
+    std::mutex mtx;
+    std::unordered_set<crow::websocket::connection*> users;
+
+    crow::websocket::connection* player_white = nullptr;
+    crow::websocket::connection* player_black = nullptr;
+
+    Game chessgame;
+
+    CROW_ROUTE(app, "/images/<string>")
+        ([](const crow::request& req, crow::response& res, string filename) {
+        res.set_static_file_info("images/" + filename);
+        res.end();
+            });
+
+    CROW_ROUTE(app, "/")([]() {
+        const char* html = R"HTML(
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8">
+                <title>C++ 国际象棋联机版</title>
+                <link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
+                <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+                <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
+            </head>
+            <body style="font-family: Arial; padding: 20px; display: flex; gap: 40px;">
+                <div>
+                    <h2>在线对局 <span id="myRole" style="font-size:16px; color:blue;">(连接中...)</span></h2>
+                    <div id="board" style="width: 400px"></div>
+                </div>
+                <div>
+                    <h2>聊天室及系统通知</h2>
+                    <textarea id="chatBox" style="width: 300px; height: 300px; margin-bottom: 10px;" readonly></textarea><br>
+                    <input type="text" id="msgInput" style="width: 240px; padding: 5px;" placeholder="输入消息...">
+                    <button onclick="sendChat()" style="padding: 5px 15px;">发送</button>
+                </div>
+
+                <script>
+                    const ws = new WebSocket('ws://' + location.host + '/ws');
+                    const chatBox = document.getElementById('chatBox');
+                    const msgInput = document.getElementById('msgInput');
+                    const roleText = document.getElementById('myRole');
+                    let board = null;
+                    let myRole = 'spectator'; 
+
+                    function logMessage(msg) {
+                        chatBox.value += msg + '\n';
+                        chatBox.scrollTop = chatBox.scrollHeight;
+                    }
+
+                    function onDrop (source, target) {
+                        if (myRole === 'spectator') return 'snapback';
+                        ws.send(JSON.stringify({ type: 'move', from: source, to: target }));
+                        return 'snapback'; 
+                    }
+
+                    board = Chessboard('board', {
+                        draggable: true,
+                        position: 'start', // 稍后会被服务器发来的 FEN 覆盖
+                        onDrop: onDrop,
+                        pieceTheme: '/images/{piece}.png' 
+                    });
+
+                    ws.onmessage = function(event) {
+                        const data = JSON.parse(event.data);
+                        
+                        if (data.type === 'chat' || data.type === 'system') {
+                            logMessage(data.text);
+                        } 
+                        // [新增] 接收服务器发来的全量棋盘快照（用于断线重连和中途观战）
+                        else if (data.type === 'board_state') {
+                            board.position(data.fen, false); // false 代表瞬间摆好，不播放动画
+                        }
+                        else if (data.type === 'role_assign') {
+                            myRole = data.role;
+                            if (myRole === 'white') {
+                                roleText.innerText = "(你是白方 ⚪)";
+                                roleText.style.color = "green";
+                            } else if (myRole === 'black') {
+                                roleText.innerText = "(你是黑方 ⚫)";
+                                roleText.style.color = "black";
+                                board.orientation('black');
+                            } else {
+                                roleText.innerText = "(你是观战者 👀)";
+                                roleText.style.color = "gray";
+                            }
+                        }
+                        else if (data.type === 'move_success') {
+                            board.move(data.from + '-' + data.to);
+                        } 
+                        else if (data.type === 'error') {
+                            logMessage("❌ 错误: " + data.message);
+                        }
+                    };
+
+                    function sendChat() {
+                        if(msgInput.value.trim() !== "") {
+                            let prefix = myRole === 'white' ? "[白方] " : (myRole === 'black' ? "[黑方] " : "[观众] ");
+                            ws.send(JSON.stringify({ type: 'chat', text: prefix + msgInput.value }));
+                            msgInput.value = '';
+                        }
+                    }
+
+                    msgInput.addEventListener("keypress", function(event) {
+                        if (event.key === "Enter") sendChat();
+                    });
+                </script>
+            </body>
+            </html>
+        )HTML";
+        return html;
+        });
+
+    CROW_WEBSOCKET_ROUTE(app, "/ws")
+        .onopen([&](crow::websocket::connection& conn) {
+        std::lock_guard<std::mutex> _(mtx);
+        users.insert(&conn);
+
+        // 1. 分配座位
+        crow::json::wvalue role_msg;
+        role_msg["type"] = "role_assign";
+        if (player_white == nullptr) {
+            player_white = &conn; role_msg["role"] = "white";
+        }
+        else if (player_black == nullptr) {
+            player_black = &conn; role_msg["role"] = "black";
+        }
+        else {
+            role_msg["role"] = "spectator";
+        }
+        conn.send_text(role_msg.dump());
+
+        // ==========================================
+        // 2. [新增] 瞬间下发当前的棋盘残局状态！
+        // ==========================================
+        crow::json::wvalue state_msg;
+        state_msg["type"] = "board_state";
+        state_msg["fen"] = generateFEN(chessgame);
+        conn.send_text(state_msg.dump());
+
+        // 3. 广播系统通知
+        crow::json::wvalue sys_msg;
+        sys_msg["type"] = "system";
+        sys_msg["text"] = "🔔 一位玩家加入了房间。当前人数: " + to_string(users.size());
+        for (auto u : users) u->send_text(sys_msg.dump());
+            })
+        .onclose([&](crow::websocket::connection& conn, const std::string& reason) {
+        std::lock_guard<std::mutex> _(mtx);
+        users.erase(&conn);
+
+        if (player_white == &conn) {
+            player_white = nullptr;
+            crow::json::wvalue sys_msg; sys_msg["type"] = "system"; sys_msg["text"] = "⚠️ 白方玩家断开连接！";
+            for (auto u : users) u->send_text(sys_msg.dump());
+        }
+        else if (player_black == &conn) {
+            player_black = nullptr;
+            crow::json::wvalue sys_msg; sys_msg["type"] = "system"; sys_msg["text"] = "⚠️ 黑方玩家断开连接！";
+            for (auto u : users) u->send_text(sys_msg.dump());
+        }
+            })
+        .onmessage([&](crow::websocket::connection& conn, const std::string& data, bool is_binary) {
+        std::lock_guard<std::mutex> _(mtx);
+        auto msg = crow::json::load(data);
+        if (!msg) return;
+
+        if (msg["type"] == "chat") {
+            for (auto u : users) u->send_text(data);
+        }
+        else if (msg["type"] == "move") {
+            if (&conn != player_white && &conn != player_black) {
+                crow::json::wvalue err_msg; err_msg["type"] = "error"; err_msg["message"] = "观战者不能走棋！";
+                conn.send_text(err_msg.dump());
+                return;
+            }
+
+            string from_str = msg["from"].s();
+            string to_str = msg["to"].s();
+            Position startPos = stringToPos(from_str);
+            Position endPos = stringToPos(to_str);
+
+            Piece* p = chessgame.getPiece(startPos.x, startPos.y);
+
+            if (p != nullptr && p->getColor() == chessgame.getcurrentTurn()) {
+                if ((p->getColor() == WHITE && &conn != player_white) ||
+                    (p->getColor() == BLACK && &conn != player_black)) {
+                    crow::json::wvalue err_msg; err_msg["type"] = "error"; err_msg["message"] = "这不是你的棋子！";
+                    conn.send_text(err_msg.dump());
+                    return;
+                }
+
+                bool moveSuccess = p->Move(startPos, endPos, chessgame.getBoard());
+
+                if (moveSuccess) {
+                    chessgame.Record_Situation(chessgame.getBoard(), chessgame.getSituation());
+                    chessgame.changeTurn();
+
+                    crow::json::wvalue success_msg;
+                    success_msg["type"] = "move_success";
+                    success_msg["from"] = from_str;
+                    success_msg["to"] = to_str;
+                    string success_str = success_msg.dump();
+                    for (auto u : users) u->send_text(success_str);
+
+                    if (chessgame.isCheckMate() || chessgame.isStaleMate() || chessgame.isDraw(chessgame.getSituation())) {
+                        crow::json::wvalue over_msg; over_msg["type"] = "system"; over_msg["text"] = "🏆 游戏结束！";
+                        for (auto u : users) u->send_text(over_msg.dump());
+                    }
+
+                }
+                else {
+                    crow::json::wvalue err_msg; err_msg["type"] = "error"; err_msg["message"] = "不合法的走棋，请重试！";
+                    conn.send_text(err_msg.dump());
+                }
+            }
+            else {
+                crow::json::wvalue err_msg; err_msg["type"] = "error"; err_msg["message"] = "不是你的回合，或未选中正确棋子！";
+                conn.send_text(err_msg.dump());
+            }
+        }
+            });
+
+    app.port(8080).multithreaded().run();
+}
+EOF
