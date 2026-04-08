@@ -105,7 +105,7 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>"C:\SFML2.6\SFML-2.6.2\include"</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\黎佳鑫\OneDrive\Desktop\chess\include\boost_asio_1_36_0;C:\Users\黎佳鑫\OneDrive\Desktop\chess\include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -126,6 +126,7 @@
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalIncludeDirectories>C:\Users\黎佳鑫\OneDrive\Desktop\chess\include\boost_asio_1_36_0;C:\Users\黎佳鑫\OneDrive\Desktop\chess\include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -141,12 +142,14 @@
     <ClCompile Include="pieces.cpp" />
     <ClCompile Include="queen.h" />
     <ClCompile Include="rook.h" />
+    <ClCompile Include="Room.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="game.h" />
     <ClInclude Include="move.h" />
     <ClInclude Include="pawn.h" />
     <ClInclude Include="pieces.h" />
+    <ClInclude Include="Room.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

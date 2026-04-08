@@ -1,4 +1,4 @@
-
+#define ASIO_STANDALONE
 #include "crow_all.h"
 #include <unordered_set>
 #include <unordered_map>
@@ -8,11 +8,15 @@
 #include <thread>
 #include <chrono>
 #include <vector>
-
 #include "game.h"
 #include "pieces.h"
+#include "Room.h"
 
 using namespace std;
+
+unordered_map<std::string, Room> rooms;
+
+unordered_map<connection*, string> conn_to_room;
 
 // === 核心设置 ===
 const string ADMIN_PASSWORD = "8888"; // [可修改] 服主专属密码！
@@ -45,6 +49,8 @@ string generateFEN(Game& game) {
     }
     return fen;
 }
+
+
 
 // 记录玩家信息的结构体
 struct ClientInfo {
@@ -93,226 +99,10 @@ int main() {
         res.end();
             });
 
-    CROW_ROUTE(app, "/")([]() {
-        const char* html = R"HTML(
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <meta charset="utf-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-                <title>C++ 象棋 VIP 大厅</title>
-                <link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
-                <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
-                <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
-                
-                <style>
-                    body { font-family: -apple-system, sans-serif; margin: 0; padding: 10px; display: flex; flex-direction: column; align-items: center; background-color: #f4f4f9; }
-                    .main-container { width: 100%; max-width: 500px; display: flex; flex-direction: column; gap: 15px; }
-                    .header-area { text-align: center; }
-                    .header-area h2 { margin: 5px 0; font-size: 20px; color: #333; }
-                    #turnIndicator { font-size: 18px; font-weight: bold; margin: 10px 0; padding: 8px; border-radius: 5px; text-align: center; background-color: #e2e3e5; color: #383d41; }
-                    
-                    .btn-group { display: flex; gap: 5px; justify-content: center; margin-top: 5px; flex-wrap: wrap; }
-                    .btn { color: white; border: none; border-radius: 5px; padding: 8px 12px; font-size: 13px; font-weight: bold; cursor: pointer; }
-                    .btn-restart { background-color: #ff9800; }
-                    .btn-claim { background-color: #28a745; display: none; }
-                    .btn-admin-login { background-color: #6f42c1; }
-                    
-                    /* [新增] 服主控制台样式 */
-                    #adminPanel { display: none; background-color: #fff3cd; border: 2px solid #ffeeba; border-radius: 8px; padding: 15px; margin-top: 10px; }
-                    #adminPanel h3 { margin: 0 0 10px 0; color: #856404; font-size: 16px; }
-                    .user-item { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px solid #ffeeba; font-size: 14px;}
-                    .user-item:last-child { border-bottom: none; }
-                    .admin-btn { padding: 4px 8px; font-size: 12px; border: none; border-radius: 4px; cursor: pointer; margin-left: 5px; }
-                    .set-btn { background-color: #17a2b8; color: white; }
-                    .kick-btn { background-color: #dc3545; color: white; }
-                    
-                    #board { width: 100%; touch-action: none; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
-                    #chatBox { width: 100%; height: 150px; padding: 10px; box-sizing: border-box; border-radius: 8px; border: 1px solid #ddd; resize: none; font-size: 14px; background-color: #fff; }
-                    .input-row { display: flex; gap: 10px; width: 100%; }
-                    #msgInput { flex-grow: 1; padding: 12px; border-radius: 8px; border: 1px solid #ddd; font-size: 16px; }
-                    .send-btn { padding: 0 20px; background-color: #007bff; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; }
-                </style>
-            </head>
-            <body>
-                <div class="main-container">
-                    <div class="header-area">
-                        <h2>象棋 VIP 大厅 <span id="myRole" style="font-size:16px; color:#007bff;">(连接中...)</span></h2>
-                        <div id="turnIndicator">🔄 同步中...</div>
-                        <div class="btn-group">
-                            <button class="btn btn-restart" onclick="requestRestart()">🤝 申请重开</button>
-                            <button id="claimWinBtn" class="btn btn-claim" onclick="claimVictory()">🏆 对方掉线，声明胜利</button>
-                            <button id="adminLoginBtn" class="btn btn-admin-login" onclick="loginAsAdmin()">👑 认证服主</button>
-                        </div>
-                    </div>
-                    
-                    <div id="adminPanel">
-                        <h3>👑 上帝控制台 (点击指定你的对手)</h3>
-                        <div id="userListContainer">暂无其他玩家</div>
-                    </div>
-                    
-                    <div id="board"></div>
-                    <textarea id="chatBox" readonly></textarea>
-                    <div class="input-row">
-                        <input type="text" id="msgInput" placeholder="输入消息...">
-                        <button class="send-btn" onclick="sendChat()">发送</button>
-                    </div>
-                </div>
-
-                <script>
-                    const ws = new WebSocket('ws://' + location.host + '/ws');
-                    const chatBox = document.getElementById('chatBox');
-                    const roleText = document.getElementById('myRole');
-                    const turnIndicator = document.getElementById('turnIndicator');
-                    const claimWinBtn = document.getElementById('claimWinBtn');
-                    const adminPanel = document.getElementById('adminPanel');
-                    const adminLoginBtn = document.getElementById('adminLoginBtn');
-                    const userListContainer = document.getElementById('userListContainer');
-                    let board = null;
-                    let myRole = 'spectator'; 
-
-                    // 1. 获取 ID 和 昵称
-                    let myPlayerId = localStorage.getItem('chess_player_id');
-                    if (!myPlayerId) {
-                        myPlayerId = 'usr_' + Math.random().toString(36).substr(2, 9);
-                        localStorage.setItem('chess_player_id', myPlayerId);
-                    }
-                    let myName = localStorage.getItem('chess_player_name');
-                    if (!myName) {
-                        myName = prompt("欢迎来到大厅！大侠尊姓大名？") || "神秘棋手";
-                        localStorage.setItem('chess_player_name', myName);
-                    }
-
-                    ws.onopen = function() {
-                        ws.send(JSON.stringify({ type: 'auth', id: myPlayerId, name: myName }));
-                    };
-
-                    function logMessage(msg) {
-                        chatBox.value += msg + '\n';
-                        chatBox.scrollTop = chatBox.scrollHeight;
-                    }
-
-                    function updateTurnDisplay(turnColor) {
-                        if (turnColor === 'white') {
-                            turnIndicator.innerText = "➡️ 当前回合: 白方 ⚪";
-                            turnIndicator.style.backgroundColor = "#d4edda"; turnIndicator.style.color = "#155724";
-                        } else {
-                            turnIndicator.innerText = "➡️ 当前回合: 黑方 ⚫";
-                            turnIndicator.style.backgroundColor = "#d6d8db"; turnIndicator.style.color = "#1b1e21";
-                        }
-                    }
-
-                    function onDrop (source, target) {
-                        if (myRole === 'spectator') return 'snapback';
-                        ws.send(JSON.stringify({ type: 'move', from: source, to: target }));
-                        return 'snapback'; 
-                    }
-
-                    function requestRestart() { ws.send(JSON.stringify({ type: 'request_restart' })); }
-                    function claimVictory() { ws.send(JSON.stringify({ type: 'claim_win' })); }
-                    
-                    // 服主认证
-                    function loginAsAdmin() {
-                        let pwd = prompt("请输入服主密码：");
-                        if(pwd) ws.send(JSON.stringify({ type: 'admin_login', pwd: pwd }));
-                    }
-
-                    // 服主操作
-                    function setOpponent(uid) { ws.send(JSON.stringify({ type: 'admin_set_black', target_uid: uid })); }
-                    function kickUser(uid) { 
-                        if(confirm("确定要踢出这个人吗？")) ws.send(JSON.stringify({ type: 'admin_kick', target_uid: uid })); 
-                    }
-
-                    board = Chessboard('board', { draggable: true, position: 'start', onDrop: onDrop, pieceTheme: '/images/{piece}.png' });
-                    $(window).resize(board.resize);
-
-                    ws.onmessage = function(event) {
-                        const data = JSON.parse(event.data);
-                        
-                        if (data.type === 'chat' || data.type === 'system') {
-                            logMessage(data.text);
-                        } 
-                        else if (data.type === 'board_state') {
-                            board.position(data.fen, false); 
-                            if(data.turn) updateTurnDisplay(data.turn);
-                        }
-                        else if (data.type === 'restart') {
-                            board.start(false); logMessage("🔄 对局已重新开始！"); updateTurnDisplay('white');
-                            claimWinBtn.style.display = 'none';
-                        }
-                        else if (data.type === 'role_assign') {
-                            myRole = data.role;
-                            if (myRole === 'host') {
-                                roleText.innerText = "(你是服主/白方 👑)";
-                                roleText.style.color = "#856404";
-                                adminLoginBtn.style.display = "none";
-                                adminPanel.style.display = "block"; // 显示控制台
-                                myRole = 'white'; // 逻辑上依然是白方
-                            } else if (myRole === 'black') {
-                                roleText.innerText = "(你是黑方 ⚫)";
-                                roleText.style.color = "#343a40";
-                                board.orientation('black');
-                                adminLoginBtn.style.display = "block";
-                                adminPanel.style.display = "none";
-                            } else {
-                                roleText.innerText = "(你是观战者 👀)";
-                                roleText.style.color = "#6c757d";
-                                adminLoginBtn.style.display = "block";
-                                adminPanel.style.display = "none";
-                            }
-                        }
-                        else if (data.type === 'move_success') {
-                            board.position(data.fen, true);
-                            if(data.turn) updateTurnDisplay(data.turn);
-                        } 
-                        else if (data.type === 'opponent_status') {
-                            if (myRole !== 'spectator') {
-                                if (data.online === false) { claimWinBtn.style.display = 'block'; } 
-                                else { claimWinBtn.style.display = 'none'; }
-                            }
-                        }
-                        // 接收服主人员名单
-                        else if (data.type === 'admin_user_list') {
-                            userListContainer.innerHTML = '';
-                            if(!data.users || data.users.length === 0) {
-                                userListContainer.innerHTML = '暂无其他玩家'; return;
-                            }
-                            data.users.forEach(u => {
-                                let div = document.createElement('div');
-                                div.className = 'user-item';
-                                let statusText = u.is_black ? ' <strong style="color:red;">[当前黑方]</strong>' : ' [观战]';
-                                div.innerHTML = `<span>👤 ${u.name} ${statusText}</span>
-                                    <div>
-                                        <button class="admin-btn set-btn" onclick="setOpponent('${u.uid}')">设为对手</button>
-                                        <button class="admin-btn kick-btn" onclick="kickUser('${u.uid}')">踢出</button>
-                                    </div>`;
-                                userListContainer.appendChild(div);
-                            });
-                        }
-                        // 被踢出的残酷现实
-                        else if (data.type === 'kicked') {
-                            alert("你已被服主踢出房间！");
-                            ws.close();
-                            window.location.href = "about:blank"; // 直接白屏
-                        }
-                        else if (data.type === 'error') {
-                            alert("❌ " + data.message);
-                        }
-                    };
-
-                    function sendChat() {
-                        let input = document.getElementById('msgInput');
-                        if(input.value.trim() !== "") {
-                            let prefix = myRole === 'white' ? "[服主] " : (myRole === 'black' ? "[黑方] " : "[观众] ");
-                            ws.send(JSON.stringify({ type: 'chat', text: prefix + myName + ": " + input.value }));
-                            input.value = '';
-                        }
-                    }
-                </script>
-            </body>
-            </html>
-        )HTML";
-        return html;
+    CROW_ROUTE(app, "/")([](const crow::request& req, crow::response& res) {
+        // 让 Crow 直接去读取并返回你刚才建好的 index.html 文件
+        res.set_static_file_info("index.html");
+        res.end();
         });
 
     CROW_WEBSOCKET_ROUTE(app, "/ws")
@@ -528,4 +318,3 @@ int main() {
 
     app.port(8080).multithreaded().run();
 }
-EOF

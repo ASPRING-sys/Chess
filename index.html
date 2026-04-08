@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>C++ 象棋联机大厅</title>
+    <link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
+    
+    <style>
+        body { font-family: -apple-system, sans-serif; margin: 0; padding: 10px; display: flex; flex-direction: column; align-items: center; background-color: #f4f4f9; }
+        
+        #entryScreen { display: flex; flex-direction: column; gap: 15px; width: 100%; max-width: 400px; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-top: 50px; text-align: center; }
+        #entryScreen h1 { margin-top: 0; color: #333; font-size: 24px; }
+        .entry-input { padding: 12px; font-size: 16px; border: 1px solid #ccc; border-radius: 6px; width: 100%; box-sizing: border-box; text-align: center; }
+        .entry-btn { padding: 12px; font-size: 16px; font-weight: bold; color: white; border: none; border-radius: 6px; cursor: pointer; transition: background 0.2s; }
+        .btn-create-white { background-color: #f0ad4e; color: #fff; border: 1px solid #eea236; }
+        .btn-create-black { background-color: #343a40; }
+        .btn-join { background-color: #007bff; }
+        .divider { margin: 10px 0; border-bottom: 1px dashed #ccc; position: relative; }
+        .divider::after { content: "或"; position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: white; padding: 0 10px; color: #888; font-size: 14px; }
+
+        .main-container { width: 100%; max-width: 500px; display: none; flex-direction: column; gap: 15px; } 
+        .header-area { text-align: center; position: relative; }
+        .header-area h2 { margin: 5px 0; font-size: 20px; color: #333; }
+        #roomInfo { display: inline-block; background-color: #e9ecef; padding: 4px 10px; border-radius: 20px; font-size: 14px; color: #495057; margin-bottom: 5px; font-family: monospace; letter-spacing: 1px; }
+        #turnIndicator { font-size: 18px; font-weight: bold; margin: 10px 0; padding: 8px; border-radius: 5px; text-align: center; background-color: #e2e3e5; color: #383d41; }
+        
+        .btn-group { display: flex; gap: 5px; justify-content: center; margin-top: 5px; flex-wrap: wrap; }
+        .btn { color: white; border: none; border-radius: 5px; padding: 8px 12px; font-size: 13px; font-weight: bold; cursor: pointer; }
+        .btn-restart { background-color: #ff9800; }
+        .btn-claim { background-color: #28a745; display: none; }
+        .btn-leave { background-color: #dc3545; } /* 新增离开按钮样式 */
+        
+        #adminPanel { display: none; background-color: #fff3cd; border: 2px solid #ffeeba; border-radius: 8px; padding: 15px; margin-top: 10px; }
+        #adminPanel h3 { margin: 0 0 10px 0; color: #856404; font-size: 16px; }
+        .user-item { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px solid #ffeeba; font-size: 14px;}
+        .user-item:last-child { border-bottom: none; }
+        .admin-btn { padding: 4px 8px; font-size: 12px; border: none; border-radius: 4px; cursor: pointer; margin-left: 5px; }
+        .set-btn { background-color: #17a2b8; color: white; }
+        .kick-btn { background-color: #dc3545; color: white; }
+        
+        #board { width: 100%; touch-action: none; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        #chatBox { width: 100%; height: 150px; padding: 10px; box-sizing: border-box; border-radius: 8px; border: 1px solid #ddd; resize: none; font-size: 14px; background-color: #fff; }
+        .input-row { display: flex; gap: 10px; width: 100%; }
+        #msgInput { flex-grow: 1; padding: 12px; border-radius: 8px; border: 1px solid #ddd; font-size: 16px; }
+        .send-btn { padding: 0 20px; background-color: #007bff; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+    <div id="entryScreen">
+        <h1>♟️ 象棋联机大厅</h1>
+        <input type="text" id="playerNameInput" class="entry-input" placeholder="请输入你的大侠尊姓大名" maxlength="10">
+        
+        <div style="display: flex; gap: 10px;">
+            <button class="entry-btn btn-create-white" style="flex: 1;" onclick="createRoom('white')">建房 (执白)</button>
+            <button class="entry-btn btn-create-black" style="flex: 1;" onclick="createRoom('black')">建房 (执黑)</button>
+        </div>
+        
+        <div class="divider"></div>
+        
+        <input type="text" id="roomIdInput" class="entry-input" placeholder="输入6位房间号" maxlength="6" style="text-transform: uppercase;">
+        <button class="entry-btn btn-join" onclick="joinRoom()">加入房间 / 观战</button>
+    </div>
+
+    <div class="main-container" id="gameScreen">
+        <div class="header-area">
+            <div id="roomInfo">房间号: <strong id="displayRoomId">------</strong></div>
+            <h2><span id="myRole" style="font-size:16px; color:#007bff;">(同步中...)</span></h2>
+            <div id="turnIndicator">🔄 同步中...</div>
+            <div class="btn-group">
+                <button class="btn btn-restart" onclick="requestRestart()">🤝 申请重开</button>
+                <button id="claimWinBtn" class="btn btn-claim" onclick="claimVictory()">🏆 对方掉线，声明胜利</button>
+                <button class="btn btn-leave" onclick="leaveRoom()">🚪 离开房间</button>
+            </div>
+        </div>
+        
+        <div id="adminPanel">
+            <h3>👑 房主控制台 (点击指定你的对手)</h3>
+            <div id="userListContainer">暂无其他玩家</div>
+        </div>
+        
+        <div id="board"></div>
+        <textarea id="chatBox" readonly></textarea>
+        <div class="input-row">
+            <input type="text" id="msgInput" placeholder="输入消息..." onkeypress="if(event.keyCode===13) sendChat()">
+            <button class="send-btn" onclick="sendChat()">发送</button>
+        </div>
+    </div>
+
+    <script>
+        // --- SPA 路由拦截 ---
+        // 确保页面初次加载时 URL 是干净的，没有 #game 导致错乱
+        if (location.hash === '#game') {
+            history.replaceState(null, '', location.pathname);
+        }
+
+        // 监听浏览器的“后退”按钮
+        window.addEventListener('popstate', function(event) {
+            // 如果 URL 的 hash 不再是 #game，说明用户按了后退回到了大厅
+            if (location.hash !== '#game') {
+                // 直接刷新页面：最干净的断开 WebSocket 并重置状态的方法
+                window.location.reload();
+            }
+        });
+
+        const ws = new WebSocket('ws://' + location.host + '/ws');
+        const entryScreen = document.getElementById('entryScreen');
+        const gameScreen = document.getElementById('gameScreen');
+        const chatBox = document.getElementById('chatBox');
+        const roleText = document.getElementById('myRole');
+        const turnIndicator = document.getElementById('turnIndicator');
+        const claimWinBtn = document.getElementById('claimWinBtn');
+        const adminPanel = document.getElementById('adminPanel');
+        const userListContainer = document.getElementById('userListContainer');
+        const displayRoomId = document.getElementById('displayRoomId');
+        
+        let board = null;
+        let myRole = 'spectator'; 
+        let myColor = 'white'; 
+
+        let myPlayerId = localStorage.getItem('chess_player_id');
+        if (!myPlayerId) {
+            myPlayerId = 'usr_' + Math.random().toString(36).substr(2, 9);
+            localStorage.setItem('chess_player_id', myPlayerId);
+        }
+        
+        let savedName = localStorage.getItem('chess_player_name');
+        if (savedName) document.getElementById('playerNameInput').value = savedName;
+
+        function getPlayerName() {
+            let name = document.getElementById('playerNameInput').value.trim() || "神秘棋手";
+            localStorage.setItem('chess_player_name', name);
+            return name;
+        }
+
+        function createRoom(preferredColor) {
+            if (ws.readyState !== WebSocket.OPEN) return alert("连接服务器中，请稍后再试...");
+            ws.send(JSON.stringify({ 
+                type: 'auth', 
+                id: myPlayerId, 
+                name: getPlayerName(), 
+                room_id: "", 
+                color: preferredColor 
+            }));
+        }
+
+        function joinRoom() {
+            if (ws.readyState !== WebSocket.OPEN) return alert("连接服务器中，请稍后再试...");
+            let roomId = document.getElementById('roomIdInput').value.trim().toUpperCase();
+            if (roomId.length !== 6) return alert("请输入正确的 6 位房间号！");
+            
+            ws.send(JSON.stringify({ 
+                type: 'auth', 
+                id: myPlayerId, 
+                name: getPlayerName(), 
+                room_id: roomId 
+            }));
+        }
+
+        // 离开房间按钮触发的事件 (等同于按浏览器后退)
+        function leaveRoom() {
+            if (confirm("确定要离开房间返回大厅吗？")) {
+                history.back(); // 这会触发 popstate 事件，然后刷新页面
+            }
+        }
+
+        function logMessage(msg) {
+            chatBox.value += msg + '\n';
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        function updateTurnDisplay(turnColor) {
+            if (turnColor === 'white') {
+                turnIndicator.innerText = "➡️ 当前回合: 白方 ⚪";
+                turnIndicator.style.backgroundColor = "#fff3cd"; turnIndicator.style.color = "#856404";
+            } else {
+                turnIndicator.innerText = "➡️ 当前回合: 黑方 ⚫";
+                turnIndicator.style.backgroundColor = "#d6d8db"; turnIndicator.style.color = "#1b1e21";
+            }
+        }
+
+        function onDrop (source, target) {
+            if (myRole === 'spectator') return 'snapback';
+            ws.send(JSON.stringify({ type: 'move', from: source, to: target }));
+            return 'snapback'; 
+        }
+
+        function requestRestart() { ws.send(JSON.stringify({ type: 'request_restart' })); }
+        function claimVictory() { ws.send(JSON.stringify({ type: 'claim_win' })); }
+        function setOpponent(uid) { ws.send(JSON.stringify({ type: 'admin_set_black', target_uid: uid })); }
+        function kickUser(uid) { 
+            if(confirm("确定要踢出这个人吗？")) ws.send(JSON.stringify({ type: 'admin_kick', target_uid: uid })); 
+        }
+
+        board = Chessboard('board', { draggable: true, position: 'start', onDrop: onDrop, pieceTheme: '/images/{piece}.png' });
+        $(window).resize(board.resize);
+
+        ws.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            
+            if (data.type === 'chat' || data.type === 'system') {
+                logMessage(data.text);
+            } 
+            else if (data.type === 'board_state') {
+                board.position(data.fen, false); 
+                if(data.turn) updateTurnDisplay(data.turn);
+            }
+            else if (data.type === 'restart') {
+                board.start(false); logMessage("🔄 对局已重新开始！"); updateTurnDisplay('white');
+                claimWinBtn.style.display = 'none';
+            }
+            else if (data.type === 'role_assign') {
+                // --- 成功进入房间，操作 URL 历史 ---
+                if (location.hash !== '#game') {
+                    history.pushState({ inGame: true }, '', '#game');
+                }
+
+                entryScreen.style.display = 'none';
+                gameScreen.style.display = 'flex';
+                
+                if (data.room_id) displayRoomId.innerText = data.room_id; 
+                
+                myRole = data.role;
+                myColor = data.color || 'white'; 
+                board.orientation(myColor);
+
+                if (myRole === 'host') {
+                    roleText.innerText = "(你是房主 👑)";
+                    roleText.style.color = "#d35400";
+                    adminPanel.style.display = "block"; 
+                } else if (myRole === 'black') {
+                    roleText.innerText = "(你是挑战者 ⚔️)";
+                    roleText.style.color = "#2c3e50";
+                    adminPanel.style.display = "none";
+                } else {
+                    roleText.innerText = "(你是观战者 👀)";
+                    roleText.style.color = "#7f8c8d";
+                    adminPanel.style.display = "none";
+                }
+                setTimeout(() => board.resize(), 100);
+            }
+            else if (data.type === 'move_success') {
+                board.position(data.fen, true);
+                if(data.turn) updateTurnDisplay(data.turn);
+            } 
+            else if (data.type === 'opponent_status') {
+                if (myRole !== 'spectator') {
+                    if (data.online === false) { claimWinBtn.style.display = 'block'; } 
+                    else { claimWinBtn.style.display = 'none'; }
+                }
+            }
+            else if (data.type === 'admin_user_list') {
+                userListContainer.innerHTML = '';
+                if(!data.users || data.users.length === 0) {
+                    userListContainer.innerHTML = '暂无其他玩家'; return;
+                }
+                data.users.forEach(u => {
+                    let div = document.createElement('div');
+                    div.className = 'user-item';
+                    let statusText = u.is_black ? ' <strong style="color:red;">[当前对手]</strong>' : ' [观战]';
+                    div.innerHTML = `<span>👤 ${u.name} ${statusText}</span>
+                        <div>
+                            <button class="admin-btn set-btn" onclick="setOpponent('${u.uid}')">设为对手</button>
+                            <button class="admin-btn kick-btn" onclick="kickUser('${u.uid}')">踢出</button>
+                        </div>`;
+                    userListContainer.appendChild(div);
+                });
+            }
+            else if (data.type === 'kicked') {
+                alert("你已被房主踢出房间！");
+                history.back(); // 被踢也是执行回退逻辑
+            }
+            else if (data.type === 'error') {
+                alert("❌ " + data.message);
+            }
+        };
+
+        function sendChat() {
+            let input = document.getElementById('msgInput');
+            if(input.value.trim() !== "") {
+                let prefix = myRole === 'host' ? "[房主] " : (myRole === 'black' ? "[挑战者] " : "[观众] ");
+                ws.send(JSON.stringify({ type: 'chat', text: prefix + getPlayerName() + ": " + input.value }));
+                input.value = '';
+            }
+        }
+    </script>
+</body>
+</html>
