@@ -21,6 +21,8 @@ private:
     bool request_restart_white = false;
     bool request_restart_black = false;
 
+    string host_color = "white";
+
 public:
     // 构造与析构
     Room(std::string id);
@@ -34,7 +36,7 @@ public:
     std::string get_black_uid() { return black_uid; }
     bool get_request_restart_white() { return request_restart_white; }
     bool get_request_restart_black() { return request_restart_black; }
-
+    string get_host_color() { return host_color; }
     // 核心：让外部能拿到游戏对象来走棋 (返回引用)
     Game& get_game() { return chessgame; }
 
@@ -42,6 +44,7 @@ public:
     void set_host(crow::websocket::connection* conn, const std::string& uid);
     void set_black(crow::websocket::connection* conn, const std::string& uid);
     void add_spectator(crow::websocket::connection* conn);
+    void set_host_color(string c) { host_color = c; }
 
     // 当玩家掉线时，将其从房间中移除
     void remove_connection(crow::websocket::connection* conn);
@@ -54,7 +57,7 @@ public:
     void set_restart_black(bool val) { request_restart_black = val; }
     void reset_game(); // 真正执行重开对局的逻辑
 
-    // 广播方法（你之前写的很好，保留）
+    // 广播方法
     void broadcast(const std::string& msg) {
         if (player_host) player_host->send_text(msg);
         if (player_black) player_black->send_text(msg);
