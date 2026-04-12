@@ -81,4 +81,33 @@ public:
 		return INVALID;
 	}
 
+	bool is_promotion(Position end) {
+		if (this->getColor() == WHITE && end.y == 7) {
+			return true;
+		}
+		else if (this->getColor() == BLACK && end.y == 0) {
+			return true;
+		}
+	}
+
+	// 建议修改为接收一个 PieceType 参数
+	void promotion(PieceType targetType, Position end, Piece* board[8][8]) {
+		Color myColor = this->getColor();
+
+		// 1. 释放原位置（升变点）的旧棋子内存（即当前的兵）
+		// 注意：通常在 main 逻辑中，兵已经移动到了 end 位置
+		if (board[end.x][end.y] != nullptr) {
+			delete board[end.x][end.y];
+		}
+
+		// 2. 根据玩家选择实例化新对象
+		switch (targetType) {
+		case QUEEN:  board[end.x][end.y] = new Queen(myColor, end); break;
+		case ROOK:   board[end.x][end.y] = new Rook(myColor, end); break;
+		case BISHOP: board[end.x][end.y] = new Bishop(myColor, end); break;
+		case KNIGHT: board[end.x][end.y] = new Knight(myColor, end); break;
+		default:     board[end.x][end.y] = new Queen(myColor, end); break; // 默认给后
+		}
+	}
+
 };
