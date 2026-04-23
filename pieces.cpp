@@ -57,7 +57,6 @@ bool Piece::Move(Position start, Position end, Piece* board[8][8]) {
 		targetPiece = board[end.x][end.y];
 		board[end.x][end.y] = this;
 		board[start.x][start.y] = nullptr;
-
 		break;
 	case CASTLING:
 		board[end.x][end.y] = this;
@@ -91,30 +90,15 @@ bool Piece::Move(Position start, Position end, Piece* board[8][8]) {
 		lastMove.endPos = end;
 
 		if (moveType == CASTLING) {
-			board[start.x + dir][start.y]->position = { start.x + dir, start.y };
-			board[start.x + dir][start.y]->hasMoved = true;
-		}
-		int PromotionY = (this->getColor() == WHITE) ? 7 : 0;
-		if (this->getType() == PAWN && end.y == PromotionY) {
-			Piece* promotedPiece = nullptr;
-			while (true) { 
-				cout << "Pawn promotion! Which piece do you want? (Q R B N): ";
-				char r;
-				cin >> r;
-				r = toupper(r); // 兼容小写字母
-
-				if (r == 'Q') { promotedPiece = new Queen(this->getColor(), end); break; }
-				else if (r == 'R') { promotedPiece = new Rook(this->getColor(), end); break; }
-				else if (r == 'B') { promotedPiece = new Bishop(this->getColor(), end); break; }
-				else if (r == 'N') { promotedPiece = new Knight(this->getColor(), end); break; }
-				else {
-					cout << "Invalid choice! Please choose Q, R, B, or N." << endl;
-				}
+			if (board[start.x + dir][start.y]) {
+				board[start.x + dir][start.y]->position = { start.x + dir, start.y };
+				board[start.x + dir][start.y]->hasMoved = true;
 			}
-			board[end.x][end.y] = promotedPiece;
-			lastMove.pieceMoved = promotedPiece;
-			delete this;
+			else {
+				return false;
+			}
 		}
+		
 		return true;
 	}
 	else {

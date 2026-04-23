@@ -2,7 +2,6 @@
 #include<cmath>
 using namespace std;
 enum  PieceType {
-
 	PAWN,
 	ROOK,
 	KNIGHT,

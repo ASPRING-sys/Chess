@@ -9,11 +9,11 @@
 #include <chrono>
 #include <vector>
 #include <random>
-
+#include"fen.h"
 #include "game.h"
 #include "pieces.h"
 #include "Room.h"
-
+#include "pawn.h"
 using namespace std;
 
 struct ClientInfo { string uid; string name; };
@@ -24,38 +24,16 @@ unordered_map<crow::websocket::connection*, string> conn_to_room;
 unordered_map<crow::websocket::connection*, ClientInfo> client_info;
 unordered_map<string, string> created_rooms;
 
+//生成随机6位ID作为房间号
 string generateRoomID() {
     const string CHARS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
     random_device rd; mt19937 gen(rd()); uniform_int_distribution<> dis(0, CHARS.size() - 1);
     string id; for (int i = 0; i < 6; ++i) id += CHARS[dis(gen)]; return id;
 }
-
+//将字符串如e4,d4等更符合直觉的棋步转换为坐标
 Position stringToPos(const string& str) { Position pos; pos.x = str[0] - 'a'; pos.y = str[1] - '1'; return pos; }
 
-string generateFEN(Game& game) {
-    string fen = "";
-    for (int y = 7; y >= 0; y--) {
-        int emptyCount = 0;
-        for (int x = 0; x < 8; x++) {
-            Piece* p = game.getPiece(x, y);
-            if (p == nullptr) { emptyCount++; }
-            else {
-                if (emptyCount > 0) { fen += to_string(emptyCount); emptyCount = 0; }
-                char c = 'p';
-                switch (p->getType()) {
-                case PAWN: c = 'p'; break; case ROOK: c = 'r'; break;
-                case KNIGHT: c = 'n'; break; case BISHOP: c = 'b'; break;
-                case QUEEN: c = 'q'; break; case KING: c = 'k'; break;
-                }
-                if (p->getColor() == WHITE) c = toupper(c);
-                fen += c;
-            }
-        }
-        if (emptyCount > 0) fen += to_string(emptyCount);
-        if (y > 0) fen += "/";
-    }
-    return fen;
-}
+
 
 int main() {
     crow::SimpleApp app;
@@ -69,7 +47,7 @@ int main() {
             if (kv.second == room.get_room_id()) {
                 auto conn = kv.first; if (conn == host_conn) continue;
                 crow::json::wvalue u; u["uid"] = client_info[conn].uid; u["name"] = client_info[conn].name;
-                u["is_black"] = (conn == room.get_black_connection());
+                u["is_black"] = (conn == room.get_guest_connection());
                 user_list.push_back(std::move(u));
             }
         }
@@ -94,7 +72,7 @@ int main() {
         auto& room = rooms.at(room_id);
 
         bool was_host = (room.get_host_connection() == &conn);
-        bool was_black = (room.get_black_connection() == &conn);
+        bool was_black = (room.get_guest_connection() == &conn);
 
         room.remove_connection(&conn);
         conn_to_room.erase(&conn);
@@ -102,7 +80,7 @@ int main() {
 
         // 掉线通知 (触发前端的声明胜利按钮)
         crow::json::wvalue status_msg; status_msg["type"] = "opponent_status"; status_msg["online"] = false;
-        if (was_host && room.get_black_connection()) room.get_black_connection()->send_text(status_msg.dump());
+        if (was_host && room.get_guest_connection()) room.get_guest_connection()->send_text(status_msg.dump());
         if (was_black && room.get_host_connection()) room.get_host_connection()->send_text(status_msg.dump());
 
         sendUserListToHost(room);
@@ -112,7 +90,7 @@ int main() {
             std::thread([room_id]() {
                 std::this_thread::sleep_for(std::chrono::seconds(15));
                 std::lock_guard<std::mutex> lock(mtx);
-                // 15秒后如果房间还在，且依然是空的，才无情销毁
+                // 15秒后如果房间还在，且依然是空的，才销毁
                 if (rooms.count(room_id) && rooms.at(room_id).is_empty()) {
                     string host_uid = rooms.at(room_id).get_host_uid();
                     created_rooms.erase(host_uid);
@@ -168,13 +146,13 @@ int main() {
                 if (uid == room.get_host_uid()) {
                     room.set_host(&conn, uid);
                     res["role"] = "host"; res["color"] = room.get_host_color();
-                    if (room.get_black_connection()) {
+                    if (room.get_guest_connection()) {
                         crow::json::wvalue s; s["type"] = "opponent_status"; s["online"] = true;
-                        room.get_black_connection()->send_text(s.dump());
+                        room.get_guest_connection()->send_text(s.dump());
                     }
                 }
-                else if (uid == room.get_black_uid()) {
-                    room.set_black(&conn, uid);
+                else if (uid == room.get_guest_uid()) {
+                    room.set_guest(&conn, uid);
                     res["role"] = "black"; res["color"] = (room.get_host_color() == "white") ? "black" : "white";
                     if (room.get_host_connection()) {
                         crow::json::wvalue s; s["type"] = "opponent_status"; s["online"] = true;
@@ -218,7 +196,7 @@ int main() {
             string target_uid = msg["target_uid"].s();
             for (auto& kv : conn_to_room) {
                 if (kv.second == room_id && client_info[kv.first].uid == target_uid) {
-                    room.set_black(kv.first, target_uid);
+                    room.set_guest(kv.first, target_uid);
                     string enemy_color = (room.get_host_color() == "white") ? "black" : "white";
                     crow::json::wvalue role_msg; role_msg["type"] = "role_assign"; role_msg["role"] = "black"; role_msg["color"] = enemy_color;
                     kv.first->send_text(role_msg.dump());
@@ -233,8 +211,8 @@ int main() {
         // [新增] 声明胜利逻辑
         else if (type == "claim_win") {
             bool is_valid = false;
-            if (&conn == room.get_host_connection() && room.get_black_connection() == nullptr) is_valid = true;
-            if (&conn == room.get_black_connection() && room.get_host_connection() == nullptr) is_valid = true;
+            if (&conn == room.get_host_connection() && room.get_guest_connection() == nullptr) is_valid = true;
+            if (&conn == room.get_guest_connection() && room.get_host_connection() == nullptr) is_valid = true;
 
             if (is_valid) {
                 crow::json::wvalue sys_msg; sys_msg["type"] = "system";
@@ -255,9 +233,9 @@ int main() {
         // 申请重开逻辑
         else if (type == "request_restart") {
             if (&conn == room.get_host_connection()) room.set_restart_white(true);
-            if (&conn == room.get_black_connection()) room.set_restart_black(true);
+            if (&conn == room.get_guest_connection()) room.set_restart_guest(true);
 
-            if (room.get_request_restart_white() && room.get_request_restart_black()) {
+            if (room.get_request_restart_white() && room.get_request_restart_guest()) {
                 room.reset_game();
                 crow::json::wvalue restart_msg; restart_msg["type"] = "restart"; restart_msg["turn"] = "white";
                 room.broadcast(restart_msg.dump());
@@ -269,24 +247,41 @@ int main() {
             }
         }
         else if (type == "move") {
-            if (&conn != room.get_host_connection() && &conn != room.get_black_connection()) return;
+            if (&conn != room.get_host_connection() && &conn != room.get_guest_connection()) return;
             string from_str = msg["from"].s(); string to_str = msg["to"].s();
             Position startPos = stringToPos(from_str); Position endPos = stringToPos(to_str);
             Game& game = room.get_game(); Piece* p = game.getPiece(startPos.x, startPos.y);
 
             if (p != nullptr && p->getColor() == game.getcurrentTurn()) {
                 Color host_playing_color = (room.get_host_color() == "black") ? BLACK : WHITE;
-                Color black_playing_color = (room.get_host_color() == "black") ? WHITE : BLACK;
+                Color guest_playing_color = (room.get_host_color() == "black") ? WHITE : BLACK;
                 bool can_move = false;
                 if (&conn == room.get_host_connection() && p->getColor() == host_playing_color) can_move = true;
-                if (&conn == room.get_black_connection() && p->getColor() == black_playing_color) can_move = true;
+                if (&conn == room.get_guest_connection() && p->getColor() == guest_playing_color) can_move = true;
 
                 if (!can_move) {
                     crow::json::wvalue err_msg; err_msg["type"] = "error"; err_msg["message"] = "这不是你的棋子！"; conn.send_text(err_msg.dump()); return;
                 }
 
                 if (p->Move(startPos, endPos, game.getBoard())) {
-                    game.Record_Situation(game.getBoard(), game.getSituation());
+                    if (p->getType() == PAWN && static_cast<Pawn*>(p)->is_promotion(endPos)) {
+
+                        // 先广播一个临时的状态，让前端把兵移动到最后一行（不然前端的兵还停在原地）
+                        crow::json::wvalue temp_msg; temp_msg["type"] = "move_success";
+                        temp_msg["fen"] = generateFEN(game);
+                        temp_msg["turn"] = (game.getcurrentTurn() == WHITE) ? "white" : "black";
+                        room.broadcast(temp_msg.dump());
+
+                        // 通知当前走棋的玩家进行升变选择
+                        crow::json::wvalue promo_msg;
+                        promo_msg["type"] = "need_promotion";
+                        promo_msg["pos"] = to_str; // 把坐标发给前端，告诉它是哪个格子要升变
+                        conn.send_text(promo_msg.dump());
+
+                        // 🚨 核心：直接 return！不要记录棋局，不要切换回合，不要检查将死！
+                        return;
+                    }
+                    game.Record_Situation(game.getBoard(), game.getSituation(),game);
                     game.changeTurn();
                     crow::json::wvalue success_msg; success_msg["type"] = "move_success";
                     success_msg["fen"] = generateFEN(game); success_msg["turn"] = (game.getcurrentTurn() == WHITE) ? "white" : "black";
@@ -308,6 +303,53 @@ int main() {
                 else { crow::json::wvalue err_msg; err_msg["type"] = "error"; err_msg["message"] = "不合法的走棋！"; conn.send_text(err_msg.dump()); }
             }
         }
+        // [新增] 2. 处理前端传回来的升变选择
+        else if (type == "promote") {
+            // 安全校验：只有下棋的双方才能发这个指令
+            if (&conn != room.get_host_connection() && &conn != room.get_guest_connection()) return;
+
+            string pos_str = msg["pos"].s();
+            string target = msg["target"].s(); // 期望前端传回 "q" (后), "r" (车), "b" (象), "n" (马)
+            Position pos = stringToPos(pos_str);
+
+            Game& game = room.get_game();
+            Piece* p = game.getPiece(pos.x, pos.y);
+
+            // 严谨校验：确保该位置真的有个兵，且确实是当前回合玩家的兵
+            if (p != nullptr && p->getType() == PAWN && p->getColor() == game.getcurrentTurn()) {
+
+                PieceType targetType = QUEEN; // 默认升后
+                if (target == "r") targetType = ROOK;
+                else if (target == "b") targetType = BISHOP;
+                else if (target == "n") targetType = KNIGHT;
+
+                // 调用你在 pawn.h 中完善的 promotion 函数 (需传入 targetType 动态 new 不同的棋子)
+                static_cast<Pawn*>(p)->promotion(targetType, pos, game.getBoard());
+
+                // 升变完成后，继续之前被打断的回合结算！
+                game.Record_Situation(game.getBoard(), game.getSituation(),game);
+                game.changeTurn();
+
+                crow::json::wvalue success_msg; success_msg["type"] = "move_success";
+                success_msg["fen"] = generateFEN(game);
+                success_msg["turn"] = (game.getcurrentTurn() == WHITE) ? "white" : "black";
+                room.broadcast(success_msg.dump()); // 广播最终变成新棋子后的 FEN 码
+
+                // 继续之前的游戏结束判定
+                if (game.isCheckMate() || game.isStaleMate() || game.isDraw(game.getSituation())) {
+                    crow::json::wvalue over_msg; over_msg["type"] = "system";
+                    over_msg["text"] = "🏆 游戏结束！系统将在 4 秒后自动重置..."; room.broadcast(over_msg.dump());
+                    std::thread([room_id]() {
+                        std::this_thread::sleep_for(std::chrono::seconds(4));
+                        std::lock_guard<std::mutex> lock(mtx);
+                        if (rooms.count(room_id)) {
+                            auto& r = rooms.at(room_id); r.reset_game();
+                            crow::json::wvalue restart_msg; restart_msg["type"] = "restart"; restart_msg["turn"] = "white"; r.broadcast(restart_msg.dump());
+                        }
+                        }).detach();
+                }
+            }
+            }
             });
     app.port(8080).multithreaded().run();
 }

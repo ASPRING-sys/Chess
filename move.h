@@ -13,9 +13,7 @@ struct MoveRecord {
 	Position startPos;
 	Position endPos;
 };
-
 inline bool isKingSafe(Color c, Piece* board[8][8]);
-
 
 inline bool isKingSafe(Color c,Piece*board[8][8]) {
 	Position kingPos = { -1,-1 };

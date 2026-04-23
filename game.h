@@ -17,9 +17,9 @@ public:
 
 	void initBoard();//初始化棋盘
 
-	void startTerminalLoop();
+	//void startTerminalLoop();
 
-	void printBoard();
+	//void printBoard();
 
 	bool isCheckMate();
 
@@ -29,7 +29,7 @@ public:
 
 	vector<string>& getSituation() { return Situation; }
 
-	void Record_Situation(Piece* board[8][8], vector<string>& Situation);
+	void Record_Situation(Piece* board[8][8], vector<string>& Situation,Game& game);
 
 	Color getcurrentTurn() { return currentTurn; }
 
@@ -39,10 +39,14 @@ public:
 
 	bool hasAnyLegalMove(Color color,Piece*board[8][8]);
 
+	
+
 	Piece* getPiece(int x, int y) {
 		if (x >= 0 && x < 8 && y >= 0 && y < 8) {
 			return board[x][y];
 		}
 		return nullptr;
 	}
+
+	
 };

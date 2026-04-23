@@ -88,6 +88,9 @@ public:
 		else if (this->getColor() == BLACK && end.y == 0) {
 			return true;
 		}
+		
+		return false;
+		
 	}
 
 	// 建议修改为接收一个 PieceType 参数

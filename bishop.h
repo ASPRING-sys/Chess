@@ -1,5 +1,5 @@
 #pragma once
-#include"move.h"
+//#include"move.h"
 #include"pieces.h"
 class Bishop :public Piece {
 public:

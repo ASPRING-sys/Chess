@@ -5,6 +5,7 @@
 #include"knight.h"
 #include"queen.h"
 #include"rook.h"
+#include"fen.h"
 #include<vector>
 #include<string>
 using namespace std;
@@ -50,41 +51,7 @@ void Game::initBoard()
 	board[7][7] = new Rook(BLACK, { 7,7 });
 }
 
-void Game::startTerminalLoop()
-{
-	while (!isGameOver) {
-		printBoard(); // 在控制台打印当前棋盘 (用字母代表棋子)
 
-		// 1. 提示当前玩家输入
-		string colorName = (currentTurn == WHITE) ? "White" : "Black";
-		cout << colorName << "'s turn. Enter move (e.g., startX startY endX endY): ";
-
-		Position start, end;
-		cin >> start.x >> start.y >> end.x >> end.y;
-
-		// 2. 安全拦截
-		Piece* selectedPiece = board[start.x][start.y];
-		if (selectedPiece == nullptr || selectedPiece->getColor() != currentTurn) {
-			cout << "Invalid selection! You must select your own piece." << endl;
-			continue; // 选错了，直接跳过本次循环，重新输入
-		}
-
-		// 3. 尝试移动
-		bool success = selectedPiece->Move(start, end, board);
-
-		if (success) {
-			// 4. 移动成功！交换回合
-			cout << "sucessful!";
-			currentTurn = (currentTurn == WHITE) ? BLACK : WHITE;
-
-			// 检查，看看对方是不是被将死了
-			if (isCheckMate()||isStaleMate()) {
-				isGameOver = true;
-			}
-		}
-		// 如果移动失败,循环继续，还是当前玩家重走
-	}
-}
 
 bool Game::isCheckMate()
 {
@@ -116,22 +83,18 @@ bool Game::isDraw(vector<string>& Situation)
 
 
 
-void Game::Record_Situation(Piece* board[8][8], vector<string>&Situation)
+void Game::Record_Situation(Piece* board[8][8], vector<string>&Situation,Game& game)
 {
-	string s = "";
-	for (int i = 0; i < 8; i++) {
-		for (int j = 0; j < 8; j++) {
-			if (board[i][j] != nullptr) {
-				s += (to_string(board[i][j]->getColor()) + to_string(board[i][j]->getType()));
-			}
-			else {
-				s += "-";
-			}
-		}
-	}
-	Situation.push_back(s);
-	
+	string fen;
+	fen = generateFEN(*this);
+	fen += to_string(wK_CASTLE_RIGHT(game.getBoard()));
+	fen += to_string(wK_LONGCASTLE_RIGHT(game.getBoard()));
+	fen += to_string(bK_CASTLE_RIGHT(game.getBoard()));
+	fen += to_string(bK_LONGCASTLE_RIGHT(game.getBoard()));
+	fen += to_string(game.getcurrentTurn());
+	Situation.push_back(fen);
 }
+
 bool Game::hasAnyLegalMove(Color currentTurn, Piece* board[8][8])
 {
 	for (int startX = 0; startX < 8; startX++) {
@@ -172,35 +135,35 @@ bool Game::hasAnyLegalMove(Color currentTurn, Piece* board[8][8])
 #include <iostream>
 #include <cctype> // toupper
 
-void Game::printBoard() {
-	cout << "\n  0 1 2 3 4 5 6 7  <- X\n";
-
-	// 从 y = 7 往下打印到 0
-	for (int y = 7; y >= 0; y--) {
-		cout << y << " ";
-		for (int x = 0; x < 8; x++) {
-			Piece* p = board[x][y];
-			if (p == nullptr) {
-				cout << ". ";
-			}
-			else {
-				char c = '?';
-				switch (p->getType()) {
-				case PAWN:   c = 'p'; break;
-				case ROOK:   c = 'r'; break;
-				case KNIGHT: c = 'n'; break;
-				case BISHOP: c = 'b'; break;
-				case QUEEN:  c = 'q'; break;
-				case KING:   c = 'k'; break;
-				}
-				// 如果是白棋，转换为大写
-				if (p->getColor() == WHITE) {
-					c = toupper(c);
-				}
-				cout << c << " ";
-			}
-		}
-		cout << y << "\n";
-	}
-	cout << "  0 1 2 3 4 5 6 7\n  ^ Y\n\n";
-}
+//void Game::printBoard() {
+//	cout << "\n  0 1 2 3 4 5 6 7  <- X\n";
+//
+//	// 从 y = 7 往下打印到 0
+//	for (int y = 7; y >= 0; y--) {
+//		cout << y << " ";
+//		for (int x = 0; x < 8; x++) {
+//			Piece* p = board[x][y];
+//			if (p == nullptr) {
+//				cout << ". ";
+//			}
+//			else {
+//				char c = '?';
+//				switch (p->getType()) {
+//				case PAWN:   c = 'p'; break;
+//				case ROOK:   c = 'r'; break;
+//				case KNIGHT: c = 'n'; break;
+//				case BISHOP: c = 'b'; break;
+//				case QUEEN:  c = 'q'; break;
+//				case KING:   c = 'k'; break;
+//				}
+//				// 如果是白棋，转换为大写
+//				if (p->getColor() == WHITE) {
+//					c = toupper(c);
+//				}
+//				cout << c << " ";
+//			}
+//		}
+//		cout << y << "\n";
+//	}
+//	cout << "  0 1 2 3 4 5 6 7\n  ^ Y\n\n";
+//}

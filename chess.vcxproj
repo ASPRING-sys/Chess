@@ -145,6 +145,7 @@
     <ClCompile Include="Room.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="fen.h" />
     <ClInclude Include="game.h" />
     <ClInclude Include="move.h" />
     <ClInclude Include="pawn.h" />
