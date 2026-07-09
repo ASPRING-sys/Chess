@@ -2,10 +2,10 @@
 #include"pieces.h"
 #include"game.h"
 
-bool wK_CASTLE_RIGHT(Piece* board[8][8])
+inline bool wK_CASTLE_RIGHT(Piece* board[8][8])
 {
-    if (board[4][0]->getColor() == WHITE && board[4][0]->getType() == KING && board[4][0]->getHasMoved() == false
-        && board[7][0]->getColor() == WHITE && board[7][0]->getType() == ROOK && board[7][0]->getHasMoved() == false) {
+    if (board[4][0]!=nullptr&&board[4][0]->getColor() == WHITE && board[4][0]->getType() == KING && board[4][0]->getHasMoved() == false
+        && board[7][0] != nullptr && board[7][0]->getColor() == WHITE && board[7][0]->getType() == ROOK && board[7][0]->getHasMoved() == false) {
         return true;
     }
     else {
@@ -13,10 +13,10 @@ bool wK_CASTLE_RIGHT(Piece* board[8][8])
     }
 }
 
-bool wK_LONGCASTLE_RIGHT(Piece* board[8][8])
+inline bool wK_LONGCASTLE_RIGHT(Piece* board[8][8])
 {
-    if (board[4][0]->getColor() == WHITE && board[4][0]->getType() == KING && board[4][0]->getHasMoved() == false
-        && board[0][0]->getColor() == WHITE && board[0][0]->getType() == ROOK && board[0][0]->getHasMoved() == false) {
+    if (board[4][0] != nullptr && board[4][0]->getColor() == WHITE && board[4][0]->getType() == KING && board[4][0]->getHasMoved() == false
+        && board[0][0] != nullptr && board[0][0]->getColor() == WHITE && board[0][0]->getType() == ROOK && board[0][0]->getHasMoved() == false) {
         return true;
     }
     else {
@@ -24,10 +24,10 @@ bool wK_LONGCASTLE_RIGHT(Piece* board[8][8])
     }
 }
 
-bool bK_CASTLE_RIGHT(Piece* board[8][8])
+inline bool bK_CASTLE_RIGHT(Piece* board[8][8])
 {
-    if (board[4][7]->getColor() == BLACK && board[4][7]->getType() == KING && board[4][7]->getHasMoved() == false
-        && board[7][7]->getColor() == BLACK && board[7][7]->getType() == ROOK && board[7][7]->getHasMoved() == false) {
+    if (board[4][7] != nullptr && board[4][7]->getColor() == BLACK && board[4][7]->getType() == KING && board[4][7]->getHasMoved() == false
+        && board[7][7] != nullptr && board[7][7]->getColor() == BLACK && board[7][7]->getType() == ROOK && board[7][7]->getHasMoved() == false) {
         return true;
     }
     else {
@@ -35,10 +35,10 @@ bool bK_CASTLE_RIGHT(Piece* board[8][8])
     }
 }
 
-bool bK_LONGCASTLE_RIGHT(Piece* board[8][8])
+inline bool bK_LONGCASTLE_RIGHT(Piece* board[8][8])
 {
-    if (board[4][7]->getColor() == BLACK && board[4][7]->getType() == KING && board[4][7]->getHasMoved() == false
-        && board[0][7]->getColor() == BLACK && board[0][7]->getType() == ROOK && board[0][7]->getHasMoved() == false) {
+    if (board[4][7] != nullptr && board[4][7]->getColor() == BLACK && board[4][7]->getType() == KING && board[4][7]->getHasMoved() == false
+        && board[0][7] != nullptr && board[0][7]->getColor() == BLACK && board[0][7]->getType() == ROOK && board[0][7]->getHasMoved() == false) {
         return true;
     }
     else {
@@ -47,7 +47,7 @@ bool bK_LONGCASTLE_RIGHT(Piece* board[8][8])
 }
 
 //生成FEN字符串记录棋盘状态
-string generateFEN(Game& game) {
+inline string generateFEN(Game& game) {
     string fen = "";
     for (int y = 7; y >= 0; y--) {
         int emptyCount = 0;
